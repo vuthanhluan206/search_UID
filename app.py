@@ -1,22 +1,21 @@
 
-"""Minimal authenticated Locket username-to-UID lookup prototype for Vercel.
+"""Public Locket username-to-UID lookup prototype for Vercel.
 
 The Locket endpoint is undocumented. Only a valid, authorized session can
-access it; this code does not acquire or bypass authentication.
+access it; this code does not acquire or bypass upstream authentication.
 """
 import os
 import re
-import secrets
 from urllib.parse import urlsplit, unquote
 
 import httpx
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 app = FastAPI(
     title="Locket UID Lookup Lab",
-    version="1.0.0",
+    version="1.1.0",
     docs_url=None,
     redoc_url=None
 )
@@ -87,7 +86,7 @@ def parse_username(value: str) -> str:
 
 
 def get_uid(obj):
-    """Read known response layouts without guessing/deriving identifiers."""
+    """Read known response layouts without guessing identifiers."""
 
     if not isinstance(obj, dict):
         return None
@@ -125,7 +124,7 @@ def homepage():
 <meta charset='utf-8'>
 <meta name='viewport' content='width=device-width,initial-scale=1'>
 
-<title>Locket UID Lookup — Thử nghiệm</title>
+<title>Locket UID Lookup</title>
 
 <style>
 :root {
@@ -222,23 +221,13 @@ code {
     <h1>Tìm UID Locket</h1>
 
     <p>
-        Thử nghiệm tra cứu username → UID từ link hồ sơ Locket.
+        Tra cứu UID bằng username hoặc link hồ sơ Locket.
         API này <strong>không chính thức</strong>
         và có thể từ chối yêu cầu.
     </p>
 
     <form id='f'>
-        <label>Khóa quản trị thử nghiệm</label>
-
-        <input
-            id='key'
-            type='password'
-            autocomplete='off'
-            required
-            placeholder='LOOKUP_ADMIN_KEY'
-        >
-
-        <label>Link Locket hoặc username</label>
+        <label for='value'>Link Locket hoặc username</label>
 
         <input
             id='value'
@@ -259,7 +248,7 @@ code {
 
     <small>
         Không nhập mật khẩu Locket, mã OTP hay token đăng nhập
-        vào biểu mẫu. Khóa quản trị không được lưu trong trình duyệt.
+        vào biểu mẫu.
     </small>
 </main>
 
@@ -279,8 +268,7 @@ f.addEventListener('submit', async e => {
             method: 'POST',
 
             headers: {
-                'Content-Type': 'application/json',
-                'X-Admin-Key': document.getElementById('key').value
+                'Content-Type': 'application/json'
             },
 
             body: JSON.stringify({
@@ -320,21 +308,8 @@ def health():
 
 
 @app.post("/api/lookup")
-async def lookup(
-    payload: LookupRequest,
-    x_admin_key: str | None = Header(default=None)
-):
-    admin_key = os.getenv("LOOKUP_ADMIN_KEY", "")
-
-    if (
-        not admin_key
-        or not x_admin_key
-        or not secrets.compare_digest(x_admin_key, admin_key)
-    ):
-        raise HTTPException(
-            status_code=401,
-            detail="Khóa quản trị không hợp lệ"
-        )
+async def lookup(payload: LookupRequest):
+    # Public endpoint: no LOOKUP_ADMIN_KEY required.
 
     try:
         username = parse_username(payload.value)
